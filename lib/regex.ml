@@ -53,43 +53,43 @@ type 'c regex =
   | Seq : 'c regex * 'c regex -> 'c regex
   | Star : 'c regex -> 'c regex
 
-(** Λ(r) is {ε} ∩ L(r); we represent it as a bool *)
-let rec l = function
+(** Returns true if a regex accepts an empty string, false otherwise *)
+let rec is_empty = function
   | Empty -> false
   | Eps -> true
   | Char _ -> false
-  | Alt (e, f) -> l e || l f
-  | Seq (e, f) -> l e && l f
+  | Alt (e, f) -> is_empty e || is_empty f
+  | Seq (e, f) -> is_empty e && is_empty f
   | Star _ -> true
 
 (** firsts: P(r) = {c | ∃s.cs ∈ L(r) } *)
-let rec p =
+let rec first =
   let open LetterSet in
   function
   | Empty | Eps -> S.empty
   | Char c -> S.singleton c
-  | Alt (e, f) -> p e <+> p f
-  | Seq (e, f) -> p e <+> if l e then p f else S.empty
-  | Star e -> p e
+  | Alt (e, f) -> first e <+> first f
+  | Seq (e, f) -> first e <+> if is_empty e then first f else S.empty
+  | Star e -> first e
 
 (** lasts: D(r) = {c | ∃s.sc ∈ L(r) } *)
-let rec d =
+let rec last =
   let open LetterSet in
   function
   | Empty | Eps -> S.empty
   | Char c -> S.singleton c
-  | Alt (f, e) -> d f <+> d e
-  | Seq (f, e) -> (if l e then d f else S.empty) <+> d e
-  | Star e -> d e
+  | Alt (f, e) -> last f <+> last e
+  | Seq (f, e) -> (if is_empty e then last f else S.empty) <+> last e
+  | Star e -> last e
 
 (** factors of length 2: F(r) = {c₁c₂ | ∃s₁s₂.s₁c₁c₂s₂ ∈ L(R)} *)
-let rec f_ =
+let rec middle =
   let open Letter2Set in
   function
   | Empty | Eps | Char _ -> S.empty
-  | Alt (e, f) -> f_ e <+> f_ f
-  | Seq (e, f) -> f_ e <+> f_ f <+> (d e <*> p f)
-  | Star e -> f_ e <+> (d e <*> p e)
+  | Alt (e, f) -> middle e <+> middle f
+  | Seq (e, f) -> middle e <+> middle f <+> (last e <*> first f)
+  | Star e -> middle e <+> (last e <*> first e)
 
 module StateMap = Map.Make (Int32)
 module CharSetMap = Map.Make (C)
@@ -129,7 +129,8 @@ let transition_map_of_letter_set : LetterSet.S.t -> StateSet.t CharSetMap.t =
 
 type t = C.t regex
 
-let fresh_state =
+(** Generates a fresh state (int identifier) *)
+let fresh_state : unit -> state =
   let counter = ref 0l in
   let incr32 r = r := Int32.succ !r in
   fun () ->
@@ -139,6 +140,8 @@ let fresh_state =
 
 let start_state = fresh_state ()
 
+(** Replaces each occurrence of a letter in a regex with a unique integer 
+   identifier *)
 let rec annotate : 'a. 'a regex -> ('a * int32) regex = function
   | Empty -> Empty
   | Eps -> Eps
@@ -163,26 +166,28 @@ let flatten_transitions : StateSet.t CharSetMap.t -> StateSet.t CharMap.t =
         cs cm)
     cm CharMap.empty
 
-let compile r =
-  (** Give every character set in 'r' a unique identifier *)
+(** [compile r] translates [r] to an NFA that succeeds on exactly
+    those strings matched by [r] *)
+let compile (r : charset regex) : nfa =
+  (* Give every character set in 'r' a unique identifier *)
   let r = annotate r in
 
-  (** The final states are the set of 'last' characters in r,
-      (+ the start state if r accepts the empty string) *)
+  (* The final states are the set of 'last' characters in r, (+ the start state
+     if r accepts the empty string) *)
   let finals =
-    if l r then StateSet.add start_state (positions (d r)) else positions (d r)
-  in
+    if is_empty r then StateSet.add start_state (positions (last r))
+    else positions (last r) in
 
-  (** Transitions arise from factor (pairs of character sets with a
-      transition between them) ... *)
-  let transitions = transition_map_of_factor_set (f_ r) in
+  (* Transitions arise from factor (pairs of character sets with a transition
+     between them) ... *)
+  let transitions = transition_map_of_factor_set (middle r) in
 
-  (** ... and from the start state to the initial character sets. *)
-  let initial_transitions = transition_map_of_letter_set (p r) in
+  (* ... and from the start state to the initial character sets. *)
+  let initial_transitions = transition_map_of_letter_set (first r) in
   let joint_transitions =
     StateMap.add start_state initial_transitions transitions in
 
-  (** The 'next' function is built from the transition sets. *)
+  (* The 'next' function is built from the transition sets. *)
   let next s =
     try flatten_transitions (StateMap.find s joint_transitions)
     with Not_found -> CharMap.empty in
@@ -224,6 +229,7 @@ let any = Char any_
 
 exception Parse_error of string
 
+(** Parser module *)
 module Parse = struct
   exception Fail
 

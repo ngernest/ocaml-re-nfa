@@ -1,10 +1,18 @@
+(** States in NFAs are identified using ints *)
 type state = int32
 
+(** A set of states is just a set of ints *)
 module StateSet = Set.Make (Int32)
+
 module CharMap = Map.Make (Char)
 
 type transitions = StateSet.t CharMap.t
 
+(** Datatype representing an NFA, containing:
+    - the set of start states ([start])
+    - accepting states ([finals]) 
+    - the transition function [next],
+      which maps a state and a character to a set of states *)
 type nfa = {
   start : StateSet.t;  (** the start states *)
   finals : StateSet.t;  (** the final (or "accept") states *)
