@@ -1,6 +1,8 @@
 ## re-nfa: convert regular expressions to NFAs
 
-[![Travis build Status](https://travis-ci.org/yallop/ocaml-re-nfa.svg?branch=master)](https://travis-ci.org/yallop/ocaml-re-nfa)
+(Code originally by Jeremy Yallop & Nada Amin. This repo is largely
+the same as the [original](https://github.com/yallop/ocaml-re-nfa/tree/master),
+except the Dune build system is used in lieu of `ocamlbuild`.)
 
 This repository provides a library and executable for converting
 regular expressions into nondeterministic finite automata (NFAs) using
@@ -16,12 +18,12 @@ by [Joel Jakobsson][joelonsql].
 
 ### The `re-nfa` executable
 
-The `re-nfa` executable accepts a single regular expression argument
+The `re_nfa` executable accepts a single regular expression argument
 and prints a [DOT][DOT] graph for the corresponding NFA or DFA to standard
 output.  For example, the following command
 
 ```
-re-nfa "a*b"
+dune exec -- re_nfa "a*b"
 ```
 
 produces the following output.
@@ -44,18 +46,18 @@ digraph {
 To display the corresponding DFA or minimized DFA, pass the `-type` argument:
 
 ```
-re-nfa -type dfa "a*b"
+dune exec -- re_nfa -type dfa "a*b"
 ```
 
 ```
-re-nfa -type dfa-minimized "a*b"
+dune exec -- re_nfa -type dfa-minimized "a*b"
 ```
 
 On a Unix system you might pipe the output directly to `dot`, and then
 on to [`display`][display], like this:
 
 ```bash
-re-nfa "a*b" | dot -Tpng | display
+dune exec -- re_nfa "a*b" | dot -Tpng | display
 ```
 
 to display the following graph:

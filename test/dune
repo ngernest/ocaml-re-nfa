@@ -1,0 +1,3 @@
+(test
+ (name tests)
+ (libraries qcheck re_nfa))

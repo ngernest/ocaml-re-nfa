@@ -1,0 +1,7 @@
+(library
+ (name re_nfa))
+
+(env
+ (dev
+  (flags
+   (:standard -g -w "-32-50"))))
