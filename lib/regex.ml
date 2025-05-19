@@ -10,7 +10,7 @@ module C = Set.Make (Char)
 
 type charset = C.t
 
-(** A 'letter' is a character set paired with an identifier that
+(** A 'letter' is a character set paired with an (integer) identifier that
     uniquely identifies the character set within the regex *)
 module Letter = struct
   type t = C.t * state
@@ -22,6 +22,7 @@ end
 module LetterSet = struct
   module S = Set.Make (Letter)
 
+  (** [<+>] is set union *)
   let ( <+> ) = S.union
 end
 
@@ -35,9 +36,12 @@ module Letter2Set = struct
 
   module S = Set.Make (Pair)
 
+  (** [<+>] is set union *)
   let ( <+> ) = S.union
+
   let ( >>= ) m k = LetterSet.S.fold (fun x s -> k x <+> s) m S.empty
 
+  (** Takes the Cartesian product of two [LetterSet]s *)
   let ( <*> ) : LetterSet.S.t -> LetterSet.S.t -> S.t =
    fun l r ->
     l >>= fun x ->
@@ -113,6 +117,8 @@ let transition_map_of_factor_set fs =
     (fun ((_, i1), (c2, i2)) sm -> add_transition i1 c2 i2 sm)
     fs StateMap.empty
 
+(** Takes a set of letters and extracts the corresponding 
+    set of integer identifiers *)
 let positions : LetterSet.S.t -> StateSet.t =
  fun s -> StateSet.of_list (List.map snd (LetterSet.S.elements s))
 
@@ -184,7 +190,9 @@ let compile (r : charset regex) : nfa =
 
   (* ... and from the start state to the initial character sets. *)
   let initial_transitions = transition_map_of_letter_set (first r) in
-  let joint_transitions =
+
+  (* [joint_transitions maps a [state] to a [char set |-> state set] map *)
+  let joint_transitions : StateSet.t CharSetMap.t StateMap.t =
     StateMap.add start_state initial_transitions transitions in
 
   (* The 'next' function is built from the transition sets. *)
